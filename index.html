@@ -194,7 +194,7 @@
 
   .input-panel {
     background: #ffffff; border-radius: 20px; padding: 2vh 3.5vw;
-    width: 44vw; max-width: 580px; min-width: 360px;
+    width: 44vw; max-width: 660px; min-width: 360px;
     border: 1px solid #dddddd; box-shadow: 0 8px 40px #00000022;
   }
   .panel-title { color: #222; font-size: 1.6vw; font-weight: 700; margin-bottom: 0.3vh; text-align: center; letter-spacing: 2px; text-transform: uppercase; }
@@ -222,6 +222,32 @@
   .btn-save:active { transform: scale(0.97); }
   .btn-cancel { background: #eeeeee; color: #666; border: none; border-radius: 10px; padding: 12px 20px; font-size: 1.4vw; font-weight: 600; cursor: pointer; transition: transform 0.1s; }
   .btn-cancel:active { transform: scale(0.97); }
+
+  /* KORREKTUR */
+  .panel-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 1vw; margin-bottom: 0.3vh; margin-right: -2vw; }
+  .panel-head::before { content: ''; }
+  .panel-head .btn-korr { justify-self: end; }
+  .panel-head .panel-title { margin-bottom: 0; }
+  .btn-korr {
+    background: #fff4e5; color: #c26a00; border: 2px solid #f0b766; border-radius: 10px;
+    padding: 0.6vh 1vw; font-size: 1.05vw; font-weight: 700; cursor: pointer;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .btn-korr:active { transform: scale(0.95); }
+  .btn-korr.on { background: #c26a00; color: #fff; border-color: #c26a00; }
+  .btn-korr:disabled { opacity: 0.35; pointer-events: none; }
+  .korr-row { display: none; justify-content: center; gap: 0.6vw; margin-bottom: 1.5vh; }
+  .korr-row.active { display: flex; }
+  .korr-k {
+    width: 3.6vw; height: 3.6vw; min-width: 38px; min-height: 38px;
+    border-radius: 10px; border: 2px solid #f0b766; background: #fff;
+    color: #c26a00; font-size: 1.6vw; font-weight: 800; cursor: pointer;
+  }
+  .korr-k.sel { background: #c26a00; border-color: #c26a00; color: #fff; }
+  .input-panel.korr-mode { border: 3px solid #f0b766; }
+  .input-panel.korr-mode .panel-subtitle { color: #c26a00; }
+  .input-panel.korr-mode .btn-save { background: #c26a00; }
+  #enter-btn.korr-only { background: #c26a00; box-shadow: 0 4px 20px #c26a0044; }
 
   /* CONFIRM */
   .confirm-overlay {
@@ -289,9 +315,13 @@
 </button>
 
 <div class="overlay" id="input-overlay">
-  <div class="input-panel">
-    <div class="panel-title">Kehre eingeben</div>
+  <div class="input-panel" id="input-panel">
+    <div class="panel-head">
+      <div class="panel-title" id="panel-title">Kehre eingeben</div>
+      <button class="btn-korr" id="korr-btn" onclick="toggleKorrektur()">✎ Korrektur</button>
+    </div>
     <div class="panel-subtitle" id="panel-label">Kehre 1 von 6</div>
+    <div class="korr-row" id="korr-row"></div>
     <div class="panel-scores">
       <div class="panel-team pt1">
         <div class="panel-team-label">Team 1</div>
@@ -447,22 +477,80 @@
       document.getElementById('winner-sub').textContent =
         'Kehren: ' + wins1 + ' : ' + wins2 + '  |  Punkte gesamt: ' + tot1 + ' : ' + tot2;
       banner.style.display = 'block';
-      document.getElementById('enter-btn').classList.add('disabled');
+      document.getElementById('enter-btn').classList.add('korr-only');
     } else {
       banner.style.display = 'none';
+      document.getElementById('enter-btn').classList.remove('korr-only');
     }
   }
 
+  var editK = null; // null = normale Eingabe, sonst Index der Kehre, die korrigiert wird
+
+  function lastDoneK() {
+    for (var i = MAX_K - 1; i >= 0; i--) if (scores[i]) return i;
+    return -1;
+  }
+
   function openInput() {
-    if (gameOver || transitioning) return;
+    if (transitioning) return;
+    document.getElementById('input-overlay').classList.add('active');
+    if (gameOver) {
+      // Nach Spielende ist nur noch eine Korrektur möglich
+      startKorrektur(lastDoneK());
+    } else {
+      setNormalMode();
+    }
+  }
+
+  function setNormalMode() {
+    editK = null;
+    document.getElementById('input-panel').classList.remove('korr-mode');
+    document.getElementById('korr-btn').classList.remove('on');
+    document.getElementById('korr-btn').textContent = '✎ Korrektur';
+    document.getElementById('korr-btn').disabled = (lastDoneK() < 0);
+    document.getElementById('korr-row').classList.remove('active');
+    document.getElementById('panel-title').textContent = 'Kehre eingeben';
     document.getElementById('input-s1').textContent = '0';
     document.getElementById('input-s2').textContent = '0';
     document.getElementById('panel-label').textContent = 'Kehre ' + (currentK + 1) + ' von ' + MAX_K;
-    document.getElementById('input-overlay').classList.add('active');
+  }
+
+  function toggleKorrektur() {
+    if (editK !== null) {
+      if (gameOver) return; // nach Spielende gibt es keine normale Eingabe mehr
+      setNormalMode();
+    } else {
+      startKorrektur(lastDoneK());
+    }
+  }
+
+  function startKorrektur(k) {
+    if (k < 0) return;
+    editK = k;
+    document.getElementById('input-panel').classList.add('korr-mode');
+    document.getElementById('korr-btn').classList.add('on');
+    document.getElementById('korr-btn').textContent = gameOver ? '✎ Korrektur' : '✕ Zurück';
+    document.getElementById('korr-btn').disabled = false;
+    document.getElementById('panel-title').textContent = 'Korrektur';
+    var row = document.getElementById('korr-row');
+    row.innerHTML = '';
+    for (var i = 0; i < MAX_K; i++) {
+      if (!scores[i]) continue;
+      var b = document.createElement('button');
+      b.className = 'korr-k' + (i === k ? ' sel' : '');
+      b.textContent = i + 1;
+      b.onclick = (function(i){ return function(){ startKorrektur(i); }; })(i);
+      row.appendChild(b);
+    }
+    row.classList.add('active');
+    document.getElementById('input-s1').textContent = scores[k].s1;
+    document.getElementById('input-s2').textContent = scores[k].s2;
+    document.getElementById('panel-label').textContent = 'Kehre ' + (k + 1) + ' korrigieren';
   }
 
   function closeInput() {
     document.getElementById('input-overlay').classList.remove('active');
+    editK = null;
   }
 
   function changeScore(team, delta) {
@@ -475,6 +563,15 @@
   function saveScore() {
     var s1 = parseInt(document.getElementById('input-s1').textContent) || 0;
     var s2 = parseInt(document.getElementById('input-s2').textContent) || 0;
+
+    if (editK !== null) {
+      // Korrektur: Kehre überschreiben, aktuelle Kehre bleibt gleich
+      scores[editK] = { s1: s1, s2: s2 };
+      closeInput();
+      updateDisplay();
+      return;
+    }
+
     scores[currentK] = { s1: s1, s2: s2 };
     closeInput();
 
